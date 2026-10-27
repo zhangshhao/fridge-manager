@@ -404,6 +404,21 @@ describe("Permissions and sessions", () => {
     ).toBe(403);
     expect((await item("鸡蛋")).batches[0].remaining.toString()).toBe("3");
   });
+  it("keeps invite links inside the configured deployment subpath", async () => {
+    const previous = process.env.APP_BASE_PATH;
+    process.env.APP_BASE_PATH = "/fridge-manager/";
+    try {
+      const response = await call("POST", "/api/invites", {});
+      expect(response.statusCode).toBe(200);
+      const url = new URL(response.json().url);
+      expect(url.origin).toBe(process.env.APP_ORIGIN);
+      expect(url.pathname).toBe("/fridge-manager/");
+      expect(url.searchParams.get("invite")).toBeTruthy();
+    } finally {
+      if (previous === undefined) delete process.env.APP_BASE_PATH;
+      else process.env.APP_BASE_PATH = previous;
+    }
+  });
   it("rejects expired invites and never exceeds the five-member limit", async () => {
     const invite = (await call("POST", "/api/invites", {})).json();
     const inviteToken = new URL(invite.url).searchParams.get("invite")!;

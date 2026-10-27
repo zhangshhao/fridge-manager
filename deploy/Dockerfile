@@ -7,7 +7,8 @@ COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN npm ci
 COPY . .
-RUN npx prisma generate && npm run build
+ARG VITE_BASE_PATH=/
+RUN npx prisma generate && VITE_BASE_PATH="$VITE_BASE_PATH" npm run build
 
 FROM build AS api
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3001

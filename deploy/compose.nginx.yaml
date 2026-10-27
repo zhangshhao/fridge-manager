@@ -1,0 +1,13 @@
+# Run with compose.yaml when the host already terminates HTTPS through Nginx.
+# Start only api (its postgres and migrate dependencies start automatically).
+services:
+  api:
+    build:
+      args:
+        VITE_BASE_PATH: /fridge-manager/
+    ports:
+      - "127.0.0.1:3001:3001"
+  migrate:
+    build:
+      args:
+        VITE_BASE_PATH: /fridge-manager/
