@@ -1,0 +1,50 @@
+{
+  "name": "fridge-manager",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web \"npm run dev -w @fridge/api\" \"npm run dev -w @fridge/web\"",
+    "build": "npm run build -w @fridge/api && npm run build -w @fridge/web",
+    "typecheck": "tsc --noEmit -p apps/api && tsc --noEmit -p apps/web",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:local": "tsx scripts/local-db.ts",
+    "admin:create": "tsx scripts/admin.ts",
+    "data:manage": "tsx scripts/data.ts",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "demo:seed": "tsx scripts/demo.ts",
+    "recipes:import": "tsx scripts/import-recipes.ts",
+    "dev:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev.ps1",
+    "recovery:check": "tsx scripts/restore-check.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.0",
+    "argon2": "0.44.0",
+    "dotenv": "17.2.3",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "24.10.0",
+    "concurrently": "9.2.1",
+    "embedded-postgres": "18.4.0-beta.17",
+    "prettier": "3.6.2",
+    "prisma": "6.19.0",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "effect": "3.21.4"
+  }
+}

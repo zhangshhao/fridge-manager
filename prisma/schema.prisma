@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id @default(cuid())
+  username String @unique
+  passwordHash String
+  createdAt DateTime @default(now())
+  sessions Session[]
+  memberships Member[]
+}
+model Session {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model Family {
+  id String @id @default(cuid())
+  name String
+  timezone String @default("Asia/Shanghai")
+  inventoryVersion Int @default(0)
+  preferences Json @default("{\"expiringDays\":3,\"seasonings\":[\"油\",\"盐\",\"生抽\"],\"avoid\":[],\"taste\":\"清淡家常\"}")
+  createdAt DateTime @default(now())
+  members Member[]
+  invites Invite[]
+  ingredients Ingredient[]
+  batches Batch[]
+  meals Meal[]
+  ledger Ledger[]
+  operations Operation[]
+  aiCalls AiCall[]
+}
+model Member {
+  id String @id @default(cuid())
+  userId String
+  familyId String
+  role String @default("member")
+  joinedAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  @@unique([familyId, userId])
+}
+model Invite {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  familyId String
+  expiresAt DateTime
+  usedAt DateTime?
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+}
+model Ingredient {
+  id String @id @default(cuid())
+  familyId String
+  name String
+  aliases String[]
+  category String
+  unit String
+  archived Boolean @default(false)
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  batches Batch[]
+  @@unique([familyId, name])
+}
+model Batch {
+  id String @id @default(cuid())
+  familyId String
+  ingredientId String
+  region String
+  original Decimal @db.Decimal(15, 3)
+  remaining Decimal @db.Decimal(15, 3)
+  purchasedAt String?
+  expiresAt String?
+  createdAt DateTime @default(now())
+  archived Boolean @default(false)
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  ledger Ledger[]
+  @@index([familyId, ingredientId])
+}
+model Meal {
+  id String @id @default(cuid())
+  familyId String
+  authorId String
+  authorName String
+  date String
+  mealType String
+  servings Int
+  note String
+  dishes Json
+  status String @default("active")
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  ledger Ledger[]
+  audits Audit[]
+  @@index([familyId, date])
+}
+model Ledger {
+  id String @id @default(cuid())
+  familyId String
+  batchId String
+  delta Decimal @db.Decimal(15, 3)
+  ingredientName String
+  unit String
+  reason String
+  actorId String
+  actorName String
+  mealId String?
+  reversalOf String? @unique
+  createdAt DateTime @default(now())
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  meal Meal? @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  @@index([familyId, createdAt])
+}
+model Audit {
+  id String @id @default(cuid())
+  mealId String
+  actorId String
+  action String
+  snapshot Json
+  createdAt DateTime @default(now())
+  meal Meal @relation(fields: [mealId], references: [id], onDelete: Cascade)
+}
+model Operation {
+  id String @id @default(cuid())
+  familyId String
+  key String
+  digest String
+  result Json
+  createdAt DateTime @default(now())
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  @@unique([familyId, key])
+}
+model AiCall {
+  id String @id @default(cuid())
+  familyId String
+  userId String
+  cacheKey String
+  model String
+  status String
+  requestId String?
+  durationMs Int @default(0)
+  usage Json?
+  result Json?
+  createdAt DateTime @default(now())
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  @@index([familyId, createdAt])
+  @@index([userId, createdAt])
+}

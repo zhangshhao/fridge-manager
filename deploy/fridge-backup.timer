@@ -1,0 +1,8 @@
+[Unit]
+Description=Daily Fridge Manager backup
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=10m
+[Install]
+WantedBy=timers.target

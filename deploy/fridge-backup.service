@@ -1,0 +1,9 @@
+[Unit]
+Description=Fridge Manager encrypted offsite backup
+Requires=docker.service
+After=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/fridge-manager
+ExecStart=/usr/bin/docker compose --env-file .env.production -f deploy/compose.yaml --profile maintenance run --rm backup
+# Configure OnFailure= with your host monitoring integration if needed.

@@ -1,0 +1,74 @@
+name: fridge-manager
+services:
+  postgres:
+    image: postgres:18.4-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fridge
+      POSTGRES_DB: fridge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong password}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U fridge -d fridge"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [database]
+    mem_limit: 1g
+  migrate:
+    image: fridge-api:${RELEASE:-1.0.0}
+    build: { context: .., dockerfile: deploy/Dockerfile, target: api }
+    command: [npx, prisma, migrate, deploy]
+    env_file: ../.env.production
+    depends_on: { postgres: { condition: service_healthy } }
+    networks: [database]
+    restart: "no"
+  api:
+    image: fridge-api:${RELEASE:-1.0.0}
+    build: { context: .., dockerfile: deploy/Dockerfile, target: api }
+    restart: unless-stopped
+    env_file: ../.env.production
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    networks: [database, edge]
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3001/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 512m
+    logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
+  web:
+    image: fridge-web:${RELEASE:-1.0.0}
+    build: { context: .., dockerfile: deploy/Dockerfile, target: web }
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      DOMAIN: ${DOMAIN:?Set domain}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME email}
+    volumes: [caddy_data:/data, caddy_config:/config]
+    depends_on: { api: { condition: service_healthy } }
+    networks: [edge]
+    mem_limit: 256m
+  backup:
+    build: { context: ., dockerfile: backup.Dockerfile }
+    profiles: [maintenance]
+    env_file: ../.env.production
+    volumes: [backup_state:/backup]
+    tmpfs: [/tmp]
+    networks: [database, edge]
+    depends_on: { postgres: { condition: service_healthy } }
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+  backup_state:
+networks:
+  database: { internal: true }
+  edge:
