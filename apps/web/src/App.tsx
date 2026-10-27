@@ -247,7 +247,7 @@ export default function App() {
             <aside className="sidebar">
               <a
                 className="brand"
-                href="/"
+                href={import.meta.env.BASE_URL}
                 onClick={(e) => {
                   e.preventDefault();
                   void navigate("stock");

@@ -137,8 +137,12 @@ export function authRoutes(app: FastifyInstance) {
             expiresAt: new Date(Date.now() + 86400000),
           },
         });
+        const basePath = (process.env.APP_BASE_PATH || "").replace(
+          /^\/+|\/+$/g,
+          "",
+        );
         return {
-          url: `${process.env.APP_ORIGIN}/?invite=${raw}`,
+          url: `${process.env.APP_ORIGIN}/${basePath ? `${basePath}/` : ""}?invite=${raw}`,
           expiresInHours: 24,
         };
       });

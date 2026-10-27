@@ -74,6 +74,7 @@ export class ApiError extends Error {
   }
 }
 let familyId = "";
+const apiBase = `${import.meta.env.BASE_URL}api`;
 export function setApiFamily(id: string) {
   familyId = id;
 }
@@ -85,7 +86,7 @@ export async function api<T>(
     throw new ApiError("当前处于离线状态，请联网后再操作。填写内容会保留。", 0);
   let response: Response;
   try {
-    response = await fetch(`/api${path}`, {
+    response = await fetch(`${apiBase}${path}`, {
       method: options.method || "GET",
       credentials: "same-origin",
       cache: "no-store",
