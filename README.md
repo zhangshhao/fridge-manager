@@ -1,6 +1,6 @@
 # 冰箱管家
 
-React + TypeScript + Ant Design Mobile PWA，Fastify API，Prisma + PostgreSQL。简体中文，家庭时区 Asia/Shanghai，邀请制，每个家庭一个冰箱、最多 5 位成员。
+React + TypeScript + Ant Design Mobile PWA，Fastify API，Prisma + PostgreSQL。简体中文，家庭时区 Asia/Shanghai，支持注册创建家庭、邀请家人加入，每个家庭一个冰箱、最多 5 位成员。
 
 ## 本机开始
 
@@ -26,7 +26,9 @@ npm run demo:seed
 npm run dev       # 窗口 2
 ```
 
-实际使用请创建自己的管理员，不用演示账号：
+实际使用可在登录页点击“注册账号并创建家庭”，设置账号、至少 10 位密码和家庭名称，注册成功后自动登录并成为家庭管理员。已有家庭请使用管理员的邀请链接加入。
+
+也可以通过维护脚本创建自己的管理员：
 
 ```powershell
 $env:ADMIN_USERNAME='your_admin'
@@ -62,10 +64,11 @@ npm run typecheck
 npm test
 npx playwright install chromium
 npm run build
-npm run test:e2e
+npm run test:e2e -- --project=desktop-chromium
+npm run test:e2e -- --project=mobile-chromium
 ```
 
-请先 `npm run build` 再跑端到端测试，其中 PWA 场景访问生产构建预览。集成测试只使用数据库名以 `_test` 结尾的独立数据库，会清理该测试数据库中的业务数据。端到端测试在开发数据库创建独立测试家庭并在结束时删除，覆盖桌面和手机尺寸 Chromium。生产库禁止用来测试。
+请先 `npm run build` 再跑端到端测试，其中 PWA 场景访问生产构建预览。桌面和手机分开执行，避免连续测试触发 API 每分钟限流；AI 降级场景要求测试进程的 `AI_API_KEY` 为空。集成测试只使用数据库名以 `_test` 结尾的独立数据库，会清理该测试数据库中的业务数据。端到端测试在开发数据库创建独立测试家庭并在结束时删除，覆盖桌面和手机尺寸 Chromium。生产库禁止用来测试。
 
 ## 交付文档
 

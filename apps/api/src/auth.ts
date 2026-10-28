@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import argon2 from "argon2";
+import { Prisma } from "@prisma/client";
 import {
   credentials,
   preferencesInput,
@@ -24,6 +25,55 @@ const sessionOptions = () => ({
   maxAge: 86400 * Number(process.env.SESSION_DAYS || 14),
 });
 export function authRoutes(app: FastifyInstance) {
+  app.post(
+    "/api/register",
+    { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } },
+    async (req, reply) => {
+      const input = credentials
+        .extend({
+          familyName: z.string().trim().min(1, "请输入家庭名称").max(40),
+        })
+        .parse(req.body);
+      const passwordHash = await argon2.hash(input.password, {
+        type: argon2.argon2id,
+      });
+      const raw = token();
+      try {
+        // Nested writes keep the account, family, membership and session atomic.
+        await db.user.create({
+          data: {
+            username: input.username,
+            passwordHash,
+            memberships: {
+              create: {
+                role: "admin",
+                family: { create: { name: input.familyName } },
+              },
+            },
+            sessions: {
+              create: {
+                id: digest(raw),
+                expiresAt: new Date(
+                  Date.now() + sessionOptions().maxAge * 1000,
+                ),
+              },
+            },
+          },
+        });
+      } catch (e) {
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === "P2002" &&
+          Array.isArray(e.meta?.target) &&
+          e.meta.target.includes("username")
+        )
+          throw new AppError(409, "用户名已被使用，请换一个或直接登录");
+        throw e;
+      }
+      reply.setCookie("session", raw, sessionOptions());
+      return reply.code(201).send({ ok: true });
+    },
+  );
   app.post(
     "/api/login",
     { config: { rateLimit: { max: 10, timeWindow: "15 minutes" } } },

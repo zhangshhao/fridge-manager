@@ -336,6 +336,136 @@ describe("PostgreSQL inventory transactions", () => {
   });
 });
 describe("Permissions and sessions", () => {
+  it("registers an isolated family admin with a hashed password and an active session", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/register",
+      remoteAddress: nextIP(),
+      headers: { origin: process.env.APP_ORIGIN! },
+      payload: {
+        username: " new_admin ",
+        password: "NewAdminPassword1!",
+        familyName: " 新家庭 ",
+      },
+    });
+    expect(response.statusCode, response.body).toBe(201);
+    expect(response.json()).toEqual({ ok: true });
+    const session = response.cookies.find((c) => c.name === "session")!;
+    expect(session.httpOnly).toBe(true);
+    expect(session.sameSite).toBe("Strict");
+    const h = { cookie: `session=${session.value}` };
+    const me = (await app.inject({ url: "/api/me", headers: h })).json();
+    expect(me.username).toBe("new_admin");
+    expect(me.families).toHaveLength(1);
+    expect(me.families[0]).toMatchObject({
+      name: "新家庭",
+      role: "admin",
+      timezone: "Asia/Shanghai",
+    });
+    const created = await db.user.findUniqueOrThrow({ where: { id: me.id } });
+    expect(created.passwordHash).not.toBe("NewAdminPassword1!");
+    expect(
+      await argon2.verify(created.passwordHash, "NewAdminPassword1!"),
+    ).toBe(true);
+    const { digest } = await import("../apps/api/src/core.js");
+    expect(
+      await db.session.findUnique({ where: { id: digest(session.value) } }),
+    ).toMatchObject({ userId: me.id });
+    const inventory = await app.inject({
+      url: "/api/inventory",
+      headers: { ...h, "x-family-id": me.families[0].id },
+    });
+    expect(inventory.statusCode).toBe(200);
+    expect(inventory.json()).toEqual([]);
+    expect(
+      (
+        await app.inject({
+          url: "/api/inventory",
+          headers: { ...h, "x-family-id": familyId },
+        })
+      ).statusCode,
+    ).toBe(403);
+  });
+  it.each([
+    { username: "ab" },
+    { username: "invalid user" },
+    { password: "short" },
+    { familyName: "   " },
+    { familyName: "家".repeat(41) },
+    { familyName: undefined },
+  ])(
+    "rejects invalid registration without creating accounts or families: %j",
+    async (invalid) => {
+      const response = await call("POST", "/api/register", {
+        username: "new_admin",
+        password: "NewAdminPassword1!",
+        familyName: "新家庭",
+        ...invalid,
+      });
+      expect(response.statusCode).toBe(400);
+      expect(await db.user.count()).toBe(1);
+      expect(await db.family.count()).toBe(1);
+      expect(await db.session.count()).toBe(1);
+    },
+  );
+  it("does not overwrite an existing account or leave a family after duplicate registration", async () => {
+    const response = await call("POST", "/api/register", {
+      username: "tester",
+      password: "DifferentPassword1!",
+      familyName: "不应创建的家庭",
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().message).toContain("用户名已被使用");
+    expect(response.cookies).toHaveLength(0);
+    expect(await db.family.count()).toBe(1);
+    expect(await db.session.count()).toBe(1);
+    const original = await db.user.findUniqueOrThrow({ where: { id: userId } });
+    expect(await argon2.verify(original.passwordHash, "TestPassword123!")).toBe(
+      true,
+    );
+  });
+  it("creates only one account, family and session for concurrent duplicate registrations", async () => {
+    const responses = await Promise.all(
+      ["家庭甲", "家庭乙"].map((familyName) =>
+        call("POST", "/api/register", {
+          username: "concurrent_admin",
+          password: "NewAdminPassword1!",
+          familyName,
+        }),
+      ),
+    );
+    expect(responses.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(await db.user.count()).toBe(2);
+    expect(await db.family.count()).toBe(2);
+    expect(await db.member.count()).toBe(2);
+    expect(await db.session.count()).toBe(2);
+  });
+  it("rejects untrusted registration origins and limits anonymous registration attempts", async () => {
+    const untrusted = await app.inject({
+      method: "POST",
+      url: "/api/register",
+      headers: { origin: "https://untrusted.example" },
+      payload: {
+        username: "new_admin",
+        password: "NewAdminPassword1!",
+        familyName: "新家庭",
+      },
+    });
+    expect(untrusted.statusCode).toBe(403);
+    for (let i = 0; i < 6; i++) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/register",
+        remoteAddress: "203.0.113.51",
+        headers: { origin: process.env.APP_ORIGIN! },
+        payload: {},
+      });
+      expect(response.statusCode).toBe(i < 5 ? 400 : 429);
+      if (i === 5) expect(response.json().message).toContain("频繁");
+    }
+    expect(await db.user.count()).toBe(1);
+    expect(await db.family.count()).toBe(1);
+  });
   it("returns a usable 429 response when login limit is reached", async () => {
     const responses = [];
     for (let i = 0; i < 11; i++)

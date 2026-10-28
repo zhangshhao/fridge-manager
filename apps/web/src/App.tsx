@@ -538,6 +538,7 @@ function Login({
     new URLSearchParams(location.search).get("invite") || "",
   );
   const [privacy, setPrivacy] = useState(false);
+  const [register, setRegister] = useState(false);
   return (
     <div className="login-page">
       <div className="login-story">
@@ -620,14 +621,23 @@ function Login({
               />
             </Field>
           </AsyncForm>
+          {!invite && (
+            <Button
+              secondary
+              className="full"
+              onClick={() => setRegister(true)}
+            >
+              注册账号并创建家庭
+            </Button>
+          )}
           <div className="login-invite-note">
             <ShieldIcon />
-            邀请制家庭账号
+            和家人共用一个冰箱
             <br />
-            <small>还没有账号？请让家庭管理员发送邀请链接。</small>
+            <small>已有家庭？请使用管理员发送的邀请链接加入。</small>
           </div>
           <p className="privacy-link">
-            登录即表示你了解
+            注册或登录即表示你了解
             <button onClick={() => setPrivacy(true)}>隐私与数据说明</button>
           </p>
         </div>
@@ -637,7 +647,83 @@ function Login({
           <Privacy />
         </Sheet>
       )}
+      {register && (
+        <Sheet title="注册并创建家庭" close={() => setRegister(false)}>
+          <Registration loggedIn={loggedIn} />
+        </Sheet>
+      )}
     </div>
+  );
+}
+function Registration({ loggedIn }: { loggedIn: () => Promise<void> }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [familyName, setFamilyName] = useState("");
+  return (
+    <>
+      <p className="muted">
+        注册后直接进入新家庭的冰箱，你将成为家庭管理员，可以邀请家人加入。
+      </p>
+      <AsyncForm
+        label="注册并打开冰箱"
+        submit={async () => {
+          if (password !== confirmation)
+            throw new Error("两次输入的密码不一致");
+          await api("/register", {
+            method: "POST",
+            body: { username, password, familyName },
+          });
+        }}
+        onSuccess={() => void loggedIn()}
+      >
+        <Field label="用户名" hint="3–32 位字母、数字、下划线或短横线">
+          <input
+            required
+            autoComplete="username"
+            minLength={3}
+            maxLength={32}
+            pattern="[a-zA-Z0-9_\-]+"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="给自己取一个用户名"
+          />
+        </Field>
+        <Field label="密码（至少 10 位）">
+          <input
+            required
+            autoComplete="new-password"
+            type="password"
+            minLength={10}
+            maxLength={128}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="设置登录密码"
+          />
+        </Field>
+        <Field label="确认密码">
+          <input
+            required
+            autoComplete="new-password"
+            type="password"
+            minLength={10}
+            maxLength={128}
+            value={confirmation}
+            onChange={(e) => setConfirmation(e.target.value)}
+            placeholder="再次输入密码"
+          />
+        </Field>
+        <Field label="家庭名称">
+          <input
+            required
+            maxLength={40}
+            value={familyName}
+            onChange={(e) => setFamilyName(e.target.value)}
+            placeholder="例如：我们的家"
+          />
+        </Field>
+      </AsyncForm>
+    </>
   );
 }
 const ShieldIcon = () => <Leaf size={17} />;

@@ -108,7 +108,7 @@ export async function buildApp(logging = true) {
   });
   app.get("/api/privacy", async () => ({
     contact: process.env.PRIVACY_CONTACT || "请联系家庭管理员",
-    version: "2026-10-20",
+    version: "2026-10-28",
   }));
   authRoutes(app);
   inventoryRoutes(app);
